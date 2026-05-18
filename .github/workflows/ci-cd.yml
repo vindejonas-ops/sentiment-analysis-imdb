@@ -18,13 +18,10 @@ jobs:
           python-version: "3.11"
       
       - name: Install dependencies
-        run: |
-          cd sentiment-analysis-imdb
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
       
       - name: Download IMDB data
         run: |
-          cd sentiment-analysis-imdb
           mkdir -p data
           python -c "
           from datasets import load_dataset
@@ -40,32 +37,21 @@ jobs:
           "
       
       - name: Extract features
-        run: |
-          cd sentiment-analysis-imdb
-          python src/extract_features.py
+        run: python src/extract_features.py
       
       - name: Train MLP
-        run: |
-          cd sentiment-analysis-imdb
-          python src/train_mlp.py
+        run: python src/train_mlp.py
       
       - name: Check accuracy threshold
         run: |
-          cd sentiment-analysis-imdb
           ACC=$(cat accuracy.txt)
           echo "Accuracy: $ACC"
-          python -c "
-          import sys
-          acc = float(open('accuracy.txt').read())
-          assert acc >= 0.95, f'Accuracy {acc} below 95%'
-          print(f'✅ Accuracy {acc*100:.2f}% meets threshold')
-          "
+          python -c "import sys; acc=float(open('accuracy.txt').read()); assert acc >= 0.95, f'Accuracy {acc} below 95%'; print(f'✅ Accuracy {acc*100:.2f}% meets threshold')"
       
       - name: Upload to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          cd sentiment-analysis-imdb
           python -c "
           import os
           from huggingface_hub import HfApi, upload_file
