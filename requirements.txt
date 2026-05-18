@@ -1,0 +1,11 @@
+numpy
+pandas
+matplotlib
+scikit-learn
+torch
+transformers
+huggingface_hub
+datasets
+tqdm
+joblib
+accelerate>=0.20.0

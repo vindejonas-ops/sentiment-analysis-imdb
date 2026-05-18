@@ -1,0 +1,84 @@
+name: Extract Features, Train MLP, Upload to Hugging Face
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  train-and-upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install dependencies
+        run: |
+          cd sentiment-analysis-imdb
+          pip install -r requirements.txt
+      
+      - name: Download IMDB data
+        run: |
+          cd sentiment-analysis-imdb
+          mkdir -p data
+          python -c "
+          from datasets import load_dataset
+          import pandas as pd
+          ds = load_dataset('imdb')
+          train = ds['train'].to_pandas()
+          df = pd.concat([
+              train[train['label']==0].sample(5000, random_state=42),
+              train[train['label']==1].sample(5000, random_state=42)
+          ]).sample(frac=1, random_state=42).reset_index(drop=True)
+          df.to_csv('data/imdb_balanced_10k.csv', index=False)
+          print(f'Saved {len(df)} samples')
+          "
+      
+      - name: Extract features
+        run: |
+          cd sentiment-analysis-imdb
+          python src/extract_features.py
+      
+      - name: Train MLP
+        run: |
+          cd sentiment-analysis-imdb
+          python src/train_mlp.py
+      
+      - name: Check accuracy threshold
+        run: |
+          cd sentiment-analysis-imdb
+          ACC=$(cat accuracy.txt)
+          echo "Accuracy: $ACC"
+          python -c "
+          import sys
+          acc = float(open('accuracy.txt').read())
+          assert acc >= 0.95, f'Accuracy {acc} below 95%'
+          print(f'✅ Accuracy {acc*100:.2f}% meets threshold')
+          "
+      
+      - name: Upload to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          cd sentiment-analysis-imdb
+          python -c "
+          import os
+          from huggingface_hub import HfApi, upload_file
+          
+          token = os.environ['HF_TOKEN']
+          repo_id = 'Ch1kage/Sentiment_analyse-HuggingFace'
+          
+          api = HfApi()
+          api.create_repo(repo_id, token=token, repo_type='model', exist_ok=True)
+          
+          upload_file('model/sentiment_mlp.joblib', 'sentiment_mlp.joblib', repo_id=repo_id, token=token, repo_type='model')
+          upload_file('accuracy.txt', 'accuracy.txt', repo_id=repo_id, token=token, repo_type='model')
+          upload_file('README.md', 'README.md', repo_id=repo_id, token=token, repo_type='model')
+          
+          print(f'Uploaded to https://huggingface.co/{repo_id}')
+          "
